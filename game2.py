@@ -4,7 +4,7 @@ import cv2
 import queue
 import threading
 
-# Inicializar el Pygame
+# Inicializar el Pygame(GAME)
 pygame.init()
 pygame.font.init()
 font = pygame.font.SysFont('Arial', 24)
