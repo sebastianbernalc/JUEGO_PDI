@@ -123,37 +123,92 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+            cv2.destroyAllWindows()
+            pygame.quit()
+            quit()
     
         # Inicializar la cola y el hilo de la cámara
 
     if not frame_queue.empty():
+            kernel_erode = np.ones((5, 5), np.uint8)
+            kernel_dilate = np.ones((10, 10), np.uint8)
             frame = frame_queue.get()
-        # Configurar la cámara
-            hsv=cv2.cvtColor(frame,cv2.COLOR_BGR2HSV)
+            frame = cv2.rotate(frame, cv2.ROTATE_180)
+            
+            # Convertimos la imagen a HSV
+           
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-            # Definir el rango de colores que se quiere detectar (en este ejemplo, se detectará el color azul)
+
+            # Definimos el rango de colores que queremos detectar (en este caso, amarillo)
+            lower_yellow = np.array([20, 100, 100])
+            upper_yellow = np.array([40, 255, 255])
             lower_blue = np.array([110,50,50])
             upper_blue = np.array([130,255,255])
-            # Aplicar una máscara de color azul al fotograma
-            mask = cv2.inRange(hsv, lower_blue, upper_blue)
-            # Aplicar una operación de erosión y dilatación para eliminar el ruido
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (10, 10))
-            mask = cv2.erode(mask, kernel, iterations=4)
-            mask = cv2.dilate(mask, kernel, iterations=4)
-            # Si se encuentra un objeto azul en la imagen, mover el objeto en el juego hacia ese objeto
+            # Aplicamos una máscara para obtener solo los píxeles de color amarillo
+            mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
+            mask2=cv2.inRange(hsv, lower_blue, upper_blue)
+            # Aplicamos erosión y dilatación para eliminar el ruido y mejorar la detección
+            mask = cv2.erode(mask, kernel_erode, iterations=1)
+            mask = cv2.dilate(mask, kernel_dilate, iterations=1)
+            mask2 = cv2.erode(mask2, kernel_erode, iterations=1)
+            mask2 = cv2.dilate(mask2, kernel_dilate, iterations=1)
+
+            # Buscamos el contorno del objeto de color amarillo
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours2, _ = cv2.findContours(mask2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            # Si hemos encontrado algún contorno
+            if contours:
+                # Obtenemos el contorno más grande (el objeto de color amarillo)
+                largest_contour = max(contours, key=cv2.contourArea)
+
+                # Obtenemos el rectángulo que engloba al contorno
+                x, y, w, h = cv2.boundingRect(largest_contour)
+
+                # Ajustamos la posición y tamaño del objeto de color amarillo para que se ajuste a la pantalla del juego
+                jugador1_rect.x = int(x * 3500 / 640)
+                if(jugador1_rect.x>1280):
+                    jugador1_rect.x=1280
+                
+                for contour in contours:
+                    x, y, w, h = cv2.boundingRect(contour)
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+                    # Comprobar si el objeto azul está por encima o por debajo de la mitad del eje y
+                    if y < frame.shape[0] / 2:
+                        if ~jugador1_salto:
+                            jugador1_vel = 1.0
+                            jugador1_salto = ~jugador1_salto
+                        print("Up")
+                    else:
+                        print("Down")
             
+            if contours2:
+                # Obtenemos el contorno más grande (el objeto de color amarillo)
+                largest_contour = max(contours2, key=cv2.contourArea)
 
-            # Encontrar el centro del contorno más grande
-            M = cv2.moments(mask)
-            if M["m00"] != 0:
-                cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
+                # Obtenemos el rectángulo que engloba al contorno
+                x, y, w, h = cv2.boundingRect(largest_contour)
 
-                # Mover el objeto en el juego hacia el centro del objeto azul
-                if jugador1_rect.centerx < cx:
-                    jugador1_rect.centerx += 7
-                elif jugador1_rect.centerx > cx:
-                    jugador1_rect.centerx -= 7
+                # Ajustamos la posición y tamaño del objeto de color amarillo para que se ajuste a la pantalla del juego
+                
+                jugador2_rect.x = int(x*(3500/640)-1500)
+                if(jugador1_rect.x<0):
+                    jugador1_rect.x=0
+                
+                for contour in contours2:
+                    x, y, w, h = cv2.boundingRect(contour)
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+                    # Comprobar si el objeto azul está por encima o por debajo de la mitad del eje y
+                    if y < frame.shape[0] / 2:
+                        if ~jugador2_salto:
+                            jugador2_vel = 1.0
+                            jugador2_salto = ~jugador2_salto
+                        print("Up")
+                    else:
+                        print("Down")
 
 
     # Mover jugadores
